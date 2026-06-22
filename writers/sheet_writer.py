@@ -68,6 +68,11 @@ class SheetWriter:
         label_row = [col[2] for col in self._columns]
         worksheet.update(values=[category_row, label_row], range_name="A1")
 
+        # 列数が前回実行時と異なる場合、既存の結合範囲とズレてmerge_cellsがエラーになるため、
+        # 1行目の結合を一度すべて解除してから組み直す。
+        last_col_a1 = gspread.utils.rowcol_to_a1(1, len(self._columns))
+        worksheet.unmerge_cells(f"A1:{last_col_a1}")
+
         merge_requests = []
         col_index = 0
         for category, items in config.SHEET_HEADER_STRUCTURE:
