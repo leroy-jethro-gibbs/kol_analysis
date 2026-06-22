@@ -4,7 +4,12 @@ on:
   schedule:
     # 毎週月曜 09:00 JST = UTC 00:00
     - cron: "0 0 * * 1"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      test_keyword:
+        description: "動作確認用に1件だけ実行するキーワード（空欄なら既存JSONを全件更新）"
+        required: false
+        type: string
 
 jobs:
   update:
@@ -21,19 +26,25 @@ jobs:
       - name: 依存関係インストール
         run: pip install -r requirements.txt
 
-      - name: 既存キーワードを全件更新
+      - name: キーワードを更新
         env:
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+          TEST_KEYWORD: ${{ github.event.inputs.test_keyword }}
         run: |
-          for f in data/youtube_*.json; do
-            [ -e "$f" ] || continue
-            keyword=$(basename "$f" .json | sed 's/^youtube_//')
-            echo "更新中: $keyword"
-            python main.py "$keyword"
-          done
+          if [ -n "$TEST_KEYWORD" ]; then
+            echo "動作確認実行: $TEST_KEYWORD"
+            python main.py "$TEST_KEYWORD"
+          else
+            for f in data/youtube_*.json; do
+              [ -e "$f" ] || continue
+              keyword=$(basename "$f" .json | sed 's/^youtube_//')
+              echo "更新中: $keyword"
+              python main.py "$keyword"
+            done
+          fi
 
       - name: 成功通知（Slack）
         if: success()
