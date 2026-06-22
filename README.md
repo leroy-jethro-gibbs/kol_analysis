@@ -91,6 +91,11 @@ YouTube Data API v3 は1日10,000ユニットの上限がある。
 `snippet.country` が `TARGET_COUNTRY`（JP）と完全一致しない場合は除外している
 （未設定の場合も除外する厳格なルール）。
 
+## シート項目の仕様
+
+スプレッドシート各列の値が何を根拠に生成されているか（YouTube API取得値／ルールベース算出／Claude AI生成／手動入力欄）は
+[docs/項目仕様.md](docs/項目仕様.md) を参照すること。
+
 ## 拡張方法
 
 X・TikTok・SerpAPI等を追加する場合は `collectors/base.py` の `BaseCollector` を継承し、
