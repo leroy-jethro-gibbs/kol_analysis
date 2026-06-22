@@ -17,7 +17,7 @@ GOOGLE_SERVICE_ACCOUNT_JSON_B64 = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "")
 SPREADSHEET_ID = os.getenv("SPREADSHEET_ID", "")
 
 # --- 収集制御 ---
-MAX_CHANNELS_PER_SEARCH = int(os.getenv("MAX_CHANNELS_PER_SEARCH", "50"))
+MAX_CHANNELS_PER_SEARCH = int(os.getenv("MAX_CHANNELS_PER_SEARCH", "100"))
 MAX_VIDEOS_PER_CHANNEL = int(os.getenv("MAX_VIDEOS_PER_CHANNEL", "30"))
 
 # search.listの1回あたりの最大取得数（YouTube APIの上限）
@@ -29,7 +29,7 @@ SEARCH_RELEVANCE_LANGUAGE = "ja"
 # channelのsnippet.countryがこの値と完全一致する場合のみ許容する（未設定(None)も除外する）
 TARGET_COUNTRY = "JP"
 # 動画検索によるチャンネルID収集時にページネーションする最大ページ数（クォータ保護のための上限）
-SEARCH_MAX_PAGES = 5
+SEARCH_MAX_PAGES = 10
 
 # --- Claude分析モデル ---
 CLAUDE_MODEL = "claude-sonnet-4-6"

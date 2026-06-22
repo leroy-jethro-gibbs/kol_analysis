@@ -82,9 +82,9 @@ YouTube Data API v3 は1日10,000ユニットの上限がある。
 投稿者チャンネルIDを重複排除しながら集める方式を採用している（`type="channel"`検索は
 チャンネル自身のメタデータにキーワードが含まれる場合しかヒットせず候補が少なすぎるため）。
 1ページ最大50件取得でき、`MAX_CHANNELS_PER_SEARCH`件のユニークなチャンネルIDが集まるか
-`SEARCH_MAX_PAGES`（デフォルト5）に達するかページが尽きるまでページネーションする。
-ページ追加ごとに100ユニット消費するため、`SEARCH_MAX_PAGES=5`の場合は
-1キーワードあたり最大500ユニット（+チャンネル数分のchannels.list/playlistItems.list）となる。
+`SEARCH_MAX_PAGES`（デフォルト10）に達するかページが尽きるまでページネーションする。
+ページ追加ごとに100ユニット消費するため、`SEARCH_MAX_PAGES=10`の場合は
+1キーワードあたり最大1,000ユニット（+チャンネル数分のchannels.list/playlistItems.list）となる。
 `MAX_CHANNELS_PER_SEARCH` / `MAX_VIDEOS_PER_CHANNEL` / `SEARCH_MAX_PAGES` で調整できる。
 
 検索結果は `SEARCH_REGION_CODE="JP"` で日本向けに絞り込み、取得したチャンネルの
