@@ -1,0 +1,50 @@
+name: Weekly Influencer DB Update
+
+on:
+  schedule:
+    # 毎週月曜 09:00 JST = UTC 00:00
+    - cron: "0 0 * * 1"
+  workflow_dispatch: {}
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: チェックアウト
+        uses: actions/checkout@v4
+
+      - name: Python セットアップ
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 依存関係インストール
+        run: pip install -r requirements.txt
+
+      - name: 既存キーワードを全件更新
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+        run: |
+          for f in data/youtube_*.json; do
+            [ -e "$f" ] || continue
+            keyword=$(basename "$f" .json | sed 's/^youtube_//')
+            echo "更新中: $keyword"
+            python main.py "$keyword"
+          done
+
+      - name: 成功通知（Slack）
+        if: success()
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+            --data '{"text":"インフルエンサーDB週次更新が完了しました。"}' \
+            "${{ secrets.SLACK_WEBHOOK_URL }}"
+
+      - name: エラー通知（Slack）
+        if: failure()
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+            --data '{"text":"インフルエンサーDB週次更新でエラーが発生しました。ログを確認してください。"}' \
+            "${{ secrets.SLACK_WEBHOOK_URL }}"
