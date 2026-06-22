@@ -1,8 +1,10 @@
 """YouTube Data API v3 によるインフルエンサー収集モジュール。
 
 検索フロー:
-  1. search.list でキーワード検索 → チャンネルIDリスト取得（上位MAX_CHANNELS_PER_SEARCH件）
+  1. search.list でキーワード検索 → チャンネルIDリスト取得（regionCode=JPで日本向けに絞り込み、
+     1ページ最大50件、MAX_CHANNELS_PER_SEARCH件に達するかページが尽きるまでページネーション）
   2. channels.list でチャンネル詳細取得（登録者数・開設日・説明文・投稿動画プレイリストID）
+     snippet.countryがJP以外と明示されているチャンネルはここで除外する
   3. playlistItems.list で投稿動画プレイリストから最新動画タイトルを取得（直近MAX_VIDEOS_PER_CHANNEL件）
   4. 取得データをnormalizeしてスキーマに変換
 
@@ -43,6 +45,8 @@ class YouTubeCollector(BaseCollector):
                 channel_detail = self._get_channel_detail(channel_id)
                 if channel_detail is None:
                     continue
+                if not self._is_target_country(channel_detail):
+                    continue
                 video_titles = self._get_recent_video_titles(channel_detail)
                 raw_list.append({
                     "keyword": keyword,
@@ -56,14 +60,42 @@ class YouTubeCollector(BaseCollector):
         return raw_list
 
     def _search_channel_ids(self, keyword: str) -> list[str]:
-        """search.listでキーワード検索し、チャンネルIDの上位リストを返す。"""
-        response = self.client.search().list(
-            q=keyword,
-            type="channel",
-            part="snippet",
-            maxResults=config.MAX_CHANNELS_PER_SEARCH,
-        ).execute()
-        return [item["snippet"]["channelId"] for item in response.get("items", [])]
+        """search.listでキーワード検索し、チャンネルIDのリストを返す。
+
+        1ページ最大50件（YouTube APIの上限）を、MAX_CHANNELS_PER_SEARCH件に
+        達するかページが尽きるまでnextPageTokenでページネーションする。
+        ページ追加ごとに100ユニット消費するためクォータに注意すること。
+        """
+        channel_ids = []
+        page_token = None
+
+        while len(channel_ids) < config.MAX_CHANNELS_PER_SEARCH:
+            remaining = config.MAX_CHANNELS_PER_SEARCH - len(channel_ids)
+            response = self.client.search().list(
+                q=keyword,
+                type="channel",
+                part="snippet",
+                maxResults=min(remaining, config.SEARCH_PAGE_SIZE),
+                regionCode=config.SEARCH_REGION_CODE,
+                relevanceLanguage=config.SEARCH_RELEVANCE_LANGUAGE,
+                pageToken=page_token,
+            ).execute()
+
+            channel_ids.extend(item["snippet"]["channelId"] for item in response.get("items", []))
+
+            page_token = response.get("nextPageToken")
+            if not page_token:
+                break
+
+        return channel_ids
+
+    @staticmethod
+    def _is_target_country(channel_detail: dict) -> bool:
+        """チャンネルのsnippet.countryがTARGET_COUNTRYと異なる場合に除外する。未設定の場合は許容する。"""
+        country = channel_detail.get("snippet", {}).get("country")
+        if country is None:
+            return True
+        return country == config.TARGET_COUNTRY
 
     def _get_channel_detail(self, channel_id: str) -> dict | None:
         """channels.listでチャンネル詳細（統計・開設日・概要欄・投稿動画プレイリストID）を取得する。"""
@@ -117,6 +149,7 @@ class YouTubeCollector(BaseCollector):
         descriptions = [v["description"] for v in videos]
 
         data["channel_name"] = snippet.get("title")
+        data["channel_url"] = f"https://www.youtube.com/channel/{channel.get('id')}"
         data["location"] = snippet.get("country")
         data["platform"] = "YouTube"
         data["account_created"] = snippet.get("publishedAt")
@@ -148,7 +181,8 @@ class YouTubeCollector(BaseCollector):
 
 
 # 簡易ユニットテスト（実行可能コードは不要、方針のみ記載）
-# - _search_channel_idsがMAX_CHANNELS_PER_SEARCH件以下のIDリストを返すことを確認する
+# - _search_channel_idsがMAX_CHANNELS_PER_SEARCH件以下のIDリストを、ページネーションを跨いで返すことを確認する
+# - _is_target_countryがcountry未設定の場合にTrueを返し、JP以外の場合にFalseを返すことを確認する
 # - _get_recent_video_titlesがuploads_playlist_id無しの場合に空リストを返すことを確認する
 # - _calc_pr_ratioがPRキーワードを含むタイトル数を正しく数えることを確認する
-# - normalizeの戻り値がEMPTY_SCHEMAの全キーを含むことを確認する
+# - normalizeの戻り値がEMPTY_SCHEMAの全キーを含み、channel_urlが正しい形式であることを確認する

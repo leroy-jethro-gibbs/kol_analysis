@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 EMPTY_SCHEMA = {
     # 基本情報
     "channel_name": None,
+    "channel_url": None,
     "estimated_age_group": None,
     "location": None,
     # プレゼンス

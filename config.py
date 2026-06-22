@@ -17,8 +17,17 @@ GOOGLE_SERVICE_ACCOUNT_JSON_B64 = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "")
 SPREADSHEET_ID = os.getenv("SPREADSHEET_ID", "")
 
 # --- 収集制御 ---
-MAX_CHANNELS_PER_SEARCH = int(os.getenv("MAX_CHANNELS_PER_SEARCH", "20"))
+MAX_CHANNELS_PER_SEARCH = int(os.getenv("MAX_CHANNELS_PER_SEARCH", "50"))
 MAX_VIDEOS_PER_CHANNEL = int(os.getenv("MAX_VIDEOS_PER_CHANNEL", "30"))
+
+# search.listの1回あたりの最大取得数（YouTube APIの上限）
+SEARCH_PAGE_SIZE = 50
+
+# 日本のインフルエンサーに限定するための検索条件
+SEARCH_REGION_CODE = "JP"
+SEARCH_RELEVANCE_LANGUAGE = "ja"
+# channelのsnippet.countryがこの値と異なる場合は除外する（未設定(None)は許容する）
+TARGET_COUNTRY = "JP"
 
 # --- Claude分析モデル ---
 CLAUDE_MODEL = "claude-sonnet-4-6"
@@ -40,6 +49,7 @@ MANUAL_INPUT_BG_COLOR = {"red": 0.92, "green": 0.92, "blue": 0.92}
 SHEET_HEADER_STRUCTURE = [
     ("基本情報", [
         ("channel_name", "活動名", False),
+        ("channel_url", "チャンネルURL", False),
         ("estimated_age_group", "年齢層", False),
         ("location", "拠点", False),
     ]),
