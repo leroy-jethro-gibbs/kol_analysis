@@ -77,14 +77,19 @@ YouTube Data API v3 は1日10,000ユニットの上限がある。
 動画タイトル取得には `playlistItems.list`（1ユニット/回）を使用しており、
 `search.list`（100ユニット/回）をチャンネルごとに呼ぶ実装と比べて
 1キーワードあたりの消費を大幅に抑えている。
-`search.list`は1ページ最大50件まで取得できるため、`MAX_CHANNELS_PER_SEARCH=50`（デフォルト）
-であれば1ページ分（100ユニット）で済む。50件を超えて設定した場合は
-ページネーション（nextPageToken）で追加検索するため、その都度100ユニット消費する点に注意。
-（概算: 50件設定時は1キーワードあたり約150〜170ユニット）
-`MAX_CHANNELS_PER_SEARCH` / `MAX_VIDEOS_PER_CHANNEL` で取得件数を調整できる。
+
+チャンネル候補の収集には `search.list(type="video")` でキーワードにヒットした動画の
+投稿者チャンネルIDを重複排除しながら集める方式を採用している（`type="channel"`検索は
+チャンネル自身のメタデータにキーワードが含まれる場合しかヒットせず候補が少なすぎるため）。
+1ページ最大50件取得でき、`MAX_CHANNELS_PER_SEARCH`件のユニークなチャンネルIDが集まるか
+`SEARCH_MAX_PAGES`（デフォルト5）に達するかページが尽きるまでページネーションする。
+ページ追加ごとに100ユニット消費するため、`SEARCH_MAX_PAGES=5`の場合は
+1キーワードあたり最大500ユニット（+チャンネル数分のchannels.list/playlistItems.list）となる。
+`MAX_CHANNELS_PER_SEARCH` / `MAX_VIDEOS_PER_CHANNEL` / `SEARCH_MAX_PAGES` で調整できる。
 
 検索結果は `SEARCH_REGION_CODE="JP"` で日本向けに絞り込み、取得したチャンネルの
-`snippet.country` がJP以外と明示されている場合は除外している（未設定の場合は許容）。
+`snippet.country` が `TARGET_COUNTRY`（JP）と完全一致しない場合は除外している
+（未設定の場合も除外する厳格なルール）。
 
 ## 拡張方法
 

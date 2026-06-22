@@ -26,8 +26,10 @@ SEARCH_PAGE_SIZE = 50
 # 日本のインフルエンサーに限定するための検索条件
 SEARCH_REGION_CODE = "JP"
 SEARCH_RELEVANCE_LANGUAGE = "ja"
-# channelのsnippet.countryがこの値と異なる場合は除外する（未設定(None)は許容する）
+# channelのsnippet.countryがこの値と完全一致する場合のみ許容する（未設定(None)も除外する）
 TARGET_COUNTRY = "JP"
+# 動画検索によるチャンネルID収集時にページネーションする最大ページ数（クォータ保護のための上限）
+SEARCH_MAX_PAGES = 5
 
 # --- Claude分析モデル ---
 CLAUDE_MODEL = "claude-sonnet-4-6"

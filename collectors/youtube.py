@@ -1,10 +1,11 @@
 """YouTube Data API v3 によるインフルエンサー収集モジュール。
 
 検索フロー:
-  1. search.list でキーワード検索 → チャンネルIDリスト取得（regionCode=JPで日本向けに絞り込み、
-     1ページ最大50件、MAX_CHANNELS_PER_SEARCH件に達するかページが尽きるまでページネーション）
+  1. search.list でキーワードの動画検索 → ヒットした動画の投稿者チャンネルIDを重複排除しながら収集
+     （regionCode=JPで日本向けに絞り込み、1ページ最大50件、MAX_CHANNELS_PER_SEARCH件に
+     達するかSEARCH_MAX_PAGES（クォータ保護の上限）かページが尽きるまでページネーション）
   2. channels.list でチャンネル詳細取得（登録者数・開設日・説明文・投稿動画プレイリストID）
-     snippet.countryがJP以外と明示されているチャンネルはここで除外する
+     snippet.countryがTARGET_COUNTRY（JP）と完全一致しないチャンネルはここで除外する
   3. playlistItems.list で投稿動画プレイリストから最新動画タイトルを取得（直近MAX_VIDEOS_PER_CHANNEL件）
   4. 取得データをnormalizeしてスキーマに変換
 
@@ -12,6 +13,8 @@
   search.list は1回100ユニット、channels.list / playlistItems.list は1回1ユニット。
   チャンネルごとの動画取得にsearch.listを使うと20チャンネルで2,000ユニットを消費し
   1日10,000ユニットの上限にすぐ達してしまうため、ここでは安価なplaylistItems.listを使用する。
+  動画検索方式はtype="channel"検索よりヒット候補が大幅に増えるが、SEARCH_MAX_PAGES（デフォルト5）
+  により1キーワードあたりのsearch.list呼び出し回数の上限を設け、クォータ超過を防いでいる。
 """
 import logging
 
@@ -60,41 +63,48 @@ class YouTubeCollector(BaseCollector):
         return raw_list
 
     def _search_channel_ids(self, keyword: str) -> list[str]:
-        """search.listでキーワード検索し、チャンネルIDのリストを返す。
+        """search.list（動画検索）でキーワードにヒットした動画の投稿者チャンネルIDを収集する。
 
-        1ページ最大50件（YouTube APIの上限）を、MAX_CHANNELS_PER_SEARCH件に
-        達するかページが尽きるまでnextPageTokenでページネーションする。
-        ページ追加ごとに100ユニット消費するためクォータに注意すること。
+        type="channel"検索はチャンネル自身のメタデータにキーワードが含まれる
+        場合しかヒットせず候補が極端に少なくなるため、動画検索でヒットした
+        動画の投稿者チャンネルIDを重複排除しながら集める方式にする。
+        MAX_CHANNELS_PER_SEARCH件のユニークなチャンネルIDが集まるか、
+        SEARCH_MAX_PAGES（クォータ保護の上限）に達するか、ページが尽きるまで
+        nextPageTokenでページネーションする。ページ追加ごとに100ユニット消費する。
         """
-        channel_ids = []
+        channel_ids: list[str] = []
+        seen_channel_ids: set[str] = set()
         page_token = None
+        page_count = 0
 
-        while len(channel_ids) < config.MAX_CHANNELS_PER_SEARCH:
-            remaining = config.MAX_CHANNELS_PER_SEARCH - len(channel_ids)
+        while len(channel_ids) < config.MAX_CHANNELS_PER_SEARCH and page_count < config.SEARCH_MAX_PAGES:
             response = self.client.search().list(
                 q=keyword,
-                type="channel",
+                type="video",
                 part="snippet",
-                maxResults=min(remaining, config.SEARCH_PAGE_SIZE),
+                maxResults=config.SEARCH_PAGE_SIZE,
                 regionCode=config.SEARCH_REGION_CODE,
                 relevanceLanguage=config.SEARCH_RELEVANCE_LANGUAGE,
                 pageToken=page_token,
             ).execute()
+            page_count += 1
 
-            channel_ids.extend(item["snippet"]["channelId"] for item in response.get("items", []))
+            for item in response.get("items", []):
+                channel_id = item["snippet"]["channelId"]
+                if channel_id not in seen_channel_ids:
+                    seen_channel_ids.add(channel_id)
+                    channel_ids.append(channel_id)
 
             page_token = response.get("nextPageToken")
             if not page_token:
                 break
 
-        return channel_ids
+        return channel_ids[:config.MAX_CHANNELS_PER_SEARCH]
 
     @staticmethod
     def _is_target_country(channel_detail: dict) -> bool:
-        """チャンネルのsnippet.countryがTARGET_COUNTRYと異なる場合に除外する。未設定の場合は許容する。"""
+        """チャンネルのsnippet.countryがTARGET_COUNTRYと完全一致する場合のみ許容する（未設定は除外）。"""
         country = channel_detail.get("snippet", {}).get("country")
-        if country is None:
-            return True
         return country == config.TARGET_COUNTRY
 
     def _get_channel_detail(self, channel_id: str) -> dict | None:
